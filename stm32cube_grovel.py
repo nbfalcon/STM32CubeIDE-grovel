@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import re
 from typing import Iterable
@@ -94,7 +95,7 @@ def action_rebase(source_dir: str, target_dir: str):
         base, ext = os.path.splitext(srcfile)
         if not base.endswith("_snippets"):
             continue
-        original_file = os.path.join(os.path.relpath(base.removesuffix("_snippets") + ext, source_dir), target_dir)
+        original_file = os.path.join(target_dir, os.path.relpath(base.removesuffix("_snippets") + ext, source_dir))
 
         with open(srcfile, 'rb') as snippets_source_f:
             snippets_source = snippets_source_f.read()
@@ -118,13 +119,13 @@ def action_findall(source_dir: str):
             continue
         with open(srcfile, 'rb') as source_file:
             source = source_file.read()
-            line_ends = detect_line_ends(source)
+            line_end = detect_line_ends(source)
             snippets = list(extract_snippets_from_source(source))
 
             if not snippets:
                 continue
 
-            content = line_ends.join(source[start:end] for _, start, end in snippets) + line_ends
+            content = line_end.join(source[start:end] for _, start, end in snippets)
             print(srcfile + ":")
             print(content.decode('utf-8'))
 
@@ -132,12 +133,15 @@ def action_findall(source_dir: str):
 def main(argv: list[str]):
     import argparse
     parser = argparse.ArgumentParser(prog='stm32cube_grovel',
-        description='Extracts /* USER CODE BEGIN */ ... /* USR CODE END */ snippets from STM32CubeIde Projects',
-        epilog="Copyright (C) 2022 Nikita Bloshchanevich")
+                                     description='Extracts /* USER CODE BEGIN */ ... /* USER CODE END */ snippets from STM32CubeIde Projects',
+                                     epilog="Copyright (C) 2022 Nikita Bloshchanevich")
     action_group = parser.add_mutually_exclusive_group(required=True)
-    action_group.add_argument('-l', '--list', action='store_true')
-    action_group.add_argument('-x', '--extract', action='store_true')
-    action_group.add_argument('-r', '--rebase', action='store_true')
+    action_group.add_argument('-p', '--print-all', action='store_true',
+                              help="Print all user code snippets along with their filenames")
+    action_group.add_argument('-x', '--extract', action='store_true',
+                              help="Extract all user code snippets in place into $BASENAME_snippet.$EXT files in the project")
+    action_group.add_argument('-r', '--rebase', action='store_true',
+                              help="Take all _snippet.$EXT files and use them to replace the corresponding snippets in rebase_target")
     parser.add_argument('source_dir', nargs='?', default='.')
     parser.add_argument('rebase_target', nargs='?')
 
@@ -147,13 +151,13 @@ def main(argv: list[str]):
     elif not args.rebase and args.rebase_target is not None:
         parser.error("rebase_target can only be specified with --rebase")
 
-    dir: str = args.source_dir
-    if args.list:
-        action_findall(dir)
+    source_dir: str = args.source_dir
+    if args.print_all:
+        action_findall(source_dir)
     elif args.extract:
-        action_extract_inplace(dir)
+        action_extract_inplace(source_dir)
     elif args.rebase:
-        action_rebase(dir, args.rebase_target)
+        action_rebase(source_dir, args.rebase_target)
 
 
 if __name__ == '__main__':
