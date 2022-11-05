@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import re
+import sys
 from typing import Iterable
 
 
@@ -13,7 +14,7 @@ def extract_snippets_from_source(source_text: bytes):
         begin_or_end = begin_or_end.decode('utf-8')
         if begin_or_end == 'BEGIN':
             if prev_start is not None:
-                print("WARNING: USER CODE BEGIN without matching END", prev_type)
+                print("WARNING: USER CODE BEGIN without matching END", prev_type, file=sys.stderr)
                 # snippet = source_text[prev_start:m.start()]
                 yield snippet_type, prev_start, m.start()  # yield snippet_type, snippet
             prev_start = m.start()
@@ -24,7 +25,7 @@ def extract_snippets_from_source(source_text: bytes):
             yield snippet_type, prev_start, m.end()
             prev_start = None
         else:
-            print(f"WARNING: USER CODE END without matching BEGIN ignored: {full_comment}")
+            print(f"WARNING: USER CODE END without matching BEGIN ignored: {full_comment}", file=sys.stderr)
 
 
 def exec_rewrites(source_text: bytes, rewrites: list[tuple[int, int, bytes]]):
@@ -161,6 +162,4 @@ def main(argv: list[str]):
 
 
 if __name__ == '__main__':
-    import sys
-
     main(sys.argv[1:])

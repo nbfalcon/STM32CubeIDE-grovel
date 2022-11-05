@@ -1,7 +1,7 @@
 # About
 
 STM32CubeIde projects by default mix auto-generated code with user code, which might make it harder to diff.
-User code is delimited by `/* USER CODE BEGIN */ /* USR CODE END */` comments, which this script can automatically
+User code is delimited by `/* USER CODE BEGIN */ /* USER CODE END */` comments, which this script can automatically
 extract.
 
 # Usage
