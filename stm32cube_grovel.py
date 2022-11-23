@@ -2,28 +2,28 @@
 import os
 import re
 import sys
-from typing import Iterable
+from typing import Iterable, Match
 
 
 def extract_snippets_from_source(source_text: bytes):
-    prev_start: int | None = None
+    prev_match: Match | None = None
     prev_type: str | None = None
     for m in re.finditer(rb'(/\*\s*USER CODE (BEGIN|END)([^*]*)\*/)', source_text):
         full_comment, begin_or_end, snippet_type_b = m.groups()
         snippet_type = snippet_type_b.decode('utf-8').strip()
         begin_or_end = begin_or_end.decode('utf-8')
         if begin_or_end == 'BEGIN':
-            if prev_start is not None:
+            if prev_match is not None:
                 print("WARNING: USER CODE BEGIN without matching END", prev_type, file=sys.stderr)
                 # snippet = source_text[prev_start:m.start()]
-                yield snippet_type, prev_start, m.start()  # yield snippet_type, snippet
-            prev_start = m.start()
+                yield snippet_type, prev_match.end(), m.start(), prev_match.end(), m.start()
+            prev_match = m
             prev_type = snippet_type
-        elif prev_start is not None and prev_type == snippet_type:
+        elif prev_match is not None and prev_type == snippet_type:
             # snippet = source_text[prev_start:m.end()]
             # yield snippet_type, snippet
-            yield snippet_type, prev_start, m.end()
-            prev_start = None
+            yield snippet_type, prev_match.start(), m.end(), prev_match.end(), m.start()
+            prev_match = None
         else:
             print(f"WARNING: USER CODE END without matching BEGIN ignored: {full_comment}", file=sys.stderr)
 
@@ -49,8 +49,8 @@ def exec_rewrites(source_text: bytes, rewrites: list[tuple[int, int, bytes]]):
     return b"".join(parts)
 
 
-def rewrite_snippets(rewrite_me: bytes, snippets_source: bytes, snippets: Iterable[tuple[str, int, int]]):
-    snippetmap: dict[str, bytes] = {snippet_type: snippets_source[start:end] for snippet_type, start, end in snippets}
+def rewrite_snippets(rewrite_me: bytes, snippets_source: bytes, snippets: Iterable[tuple[str, int, int, int, int]]):
+    snippetmap: dict[str, bytes] = {snippet_type: snippets_source[start:end] for snippet_type, start, end, *_ in snippets}
     rewrites = []
     for snippet_type, start, end in extract_snippets_from_source(rewrite_me):
         replace_with = snippetmap.get(snippet_type)
@@ -109,7 +109,8 @@ def action_extract_inplace(source_dir: str, target_dir: str, flat: bool):
             source = source_file.read()
             line_ends = detect_line_ends(source)
 
-            snippets = extract_snippets_from_source_all(source)
+            snippets = extract_snippets_from_source(source)
+            snippets = [snip for snip in snippets if not source[snip[3]:snip[4]].isspace()]
             if not snippets:
                 try:
                     os.remove(original_src)
@@ -119,7 +120,7 @@ def action_extract_inplace(source_dir: str, target_dir: str, flat: bool):
                     print(f"rm {original_src}")
                 continue
 
-            content = line_ends.join(source[start:end] for _, start, end in snippets)
+            content = line_ends.join(source[start:end] for _, start, end, *_ in snippets)
             if flat:
                 print(f"{srcfile} -> {original_src}")
             else:
@@ -164,7 +165,7 @@ def action_findall(source_dir: str):
             if not snippets:
                 continue
 
-            content = line_end.join(source[start:end] for _, start, end in snippets)
+            content = line_end.join(source[start:end] for _, start, end, *_ in snippets)
             print(srcfile + ":")
             print(content.decode('utf-8'))
 
