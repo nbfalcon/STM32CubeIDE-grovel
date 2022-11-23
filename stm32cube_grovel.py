@@ -97,11 +97,14 @@ def makedirs_for_file(filename: str):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
 
-def action_extract_inplace(source_dir: str, target_dir: str):
+def action_extract_inplace(source_dir: str, target_dir: str, flat: bool):
     for srcfile in dirwalk_csource(source_dir):
         if is_snip(srcfile):
             continue
-        original_src = os.path.join(target_dir, os.path.relpath(f2snip(srcfile), source_dir))
+        rel = os.path.relpath(f2snip(srcfile), source_dir)
+        if flat:
+            rel = rel.replace('/', '__')
+        original_src = os.path.join(target_dir, rel)
         with open(srcfile, 'rb') as source_file:
             source = source_file.read()
             line_ends = detect_line_ends(source)
@@ -111,10 +114,16 @@ def action_extract_inplace(source_dir: str, target_dir: str):
                 try:
                     os.remove(original_src)
                 except FileNotFoundError:
-                    pass  # It's ok - we do the equivalent of rm -f
+                    pass
+                else:
+                    print(f"rm {original_src}")
+                continue
 
             content = line_ends.join(source[start:end] for _, start, end in snippets)
-            print(srcfile)
+            if flat:
+                print(f"{srcfile} -> {original_src}")
+            else:
+                print(srcfile)
             makedirs_for_file(original_src)
             with open(original_src, 'bw') as out:
                 out.write(content)
@@ -174,18 +183,22 @@ def main(argv: list[str]):
                               help="Take all $NAME.snip files and use them to replace the corresponding snippets in rebase_target")
     parser.add_argument('source_dir', nargs='?', default='.')
     parser.add_argument('rebase_target', nargs='?')
+    parser.add_argument('-F', '--flat', action='store_true',
+                        help="Use a flat directory structure; instead of / __ is used")
 
     args = parser.parse_args(argv)
     if args.rebase and args.rebase_target is None:
         parser.error("rebase_target required with --rebase")
-    elif not (args.rebase or args.extract) and args.rebase_target is not None:
+    if not (args.rebase or args.extract) and args.rebase_target is not None:
         parser.error("rebase_target can only be specified with --rebase")
+    if args.flat and args.rebase_target is None:
+        parser.error("--flat requires a target to extract to")
 
     source_dir: str = args.source_dir
     if args.print_all:
         action_findall(source_dir)
     elif args.extract:
-        action_extract_inplace(source_dir, args.rebase_target or source_dir)
+        action_extract_inplace(source_dir, target_dir=args.rebase_target or source_dir, flat=args.flat)
     elif args.rebase:
         action_rebase(source_dir, args.rebase_target)
 
