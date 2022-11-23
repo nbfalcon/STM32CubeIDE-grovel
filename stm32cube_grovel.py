@@ -182,15 +182,15 @@ def main(argv: list[str]):
     action_group.add_argument('-r', '--rebase', action='store_true',
                               help="Take all $NAME.snip files and use them to replace the corresponding snippets in rebase_target")
     parser.add_argument('source_dir', nargs='?', default='.')
-    parser.add_argument('rebase_target', nargs='?')
+    parser.add_argument('-T', '--rebase-target', nargs='?')
     parser.add_argument('-F', '--flat', action='store_true',
                         help="Use a flat directory structure; instead of / __ is used")
 
     args = parser.parse_args(argv)
     if args.rebase and args.rebase_target is None:
-        parser.error("rebase_target required with --rebase")
+        parser.error("--rebase-target required with --rebase")
     if not (args.rebase or args.extract) and args.rebase_target is not None:
-        parser.error("rebase_target can only be specified with --rebase")
+        parser.error("-rebase-target can only be specified with --rebase")
     if args.flat and args.rebase_target is None:
         parser.error("--flat requires a target to extract to")
 
